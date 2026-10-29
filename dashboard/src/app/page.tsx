@@ -43,7 +43,7 @@ export default function DashboardPage() {
         {/* Dashboard content */}
         {data && (
           <>
-            <KpiRibbon kpis={data.kpis} engineStatus={data.engineStatus} />
+            <KpiRibbon telemetry={data} />
             <OperationsMatrix positions={data.activePositions} />
             <ExecutionLedger ledger={data.ledger} />
 
