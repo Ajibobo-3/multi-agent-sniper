@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-29",
+  "totalScanned": 4,
+  "totalPassedFilter": 0,
+  "totalPassedAnalyst": 0,
+  "killsByRule": {
+    "RULE_1_AUTHORITY_NOT_REVOKED": 0,
+    "RULE_2_LP_NOT_BURNED_OR_LOCKED": 0,
+    "RULE_3_LIQUIDITY_UNDER_40K": 0,
+    "RULE_4_VOLUME_1H_UNDER_50K": 2,
+    "RULE_5_TOP10_HOLDERS_OVER_25PCT": 1,
+    "RULE_6_DEV_WALLET_OVER_3PCT_OR_PAST_RUGS": 0,
+    "RULE_7_BUNDLED_LAUNCH_OVER_10PCT": 0,
+    "RULE_8_ALREADY_UP_80PCT_1H": 0,
+    "ANALYST_SCORE_UNDER_70": 1
+  },
+  "totalTrades": 0,
+  "winningTrades": 0,
+  "losingTrades": 0,
+  "winLossRatio": 0,
+  "bestTradePct": 0,
+  "worstTradePct": 0,
+  "startingBalance": 0.016,
+  "finalBalance": 0.016,
+  "netProfit": 0,
+  "netProfitPct": 0
+}

@@ -1,162 +1,79 @@
-"use client";
-
-import {
-  DollarSign,
-  TrendingUp,
-  BarChart3,
-  ShieldAlert,
-  Cpu,
-} from "lucide-react";
-import type { KPIs } from "@/types/telemetry";
-import { cn } from "@/lib/utils";
+import React from 'react';
+import { TelemetryData } from '@/types/telemetry';
 
 interface KpiRibbonProps {
-  kpis: KPIs;
-  engineStatus: "RUNNING" | "PAUSED" | "KILLED";
+  telemetry: TelemetryData;
 }
 
-export function KpiRibbon({ kpis, engineStatus }: KpiRibbonProps) {
-  const pnlPositive = kpis.dailyPnl >= 0;
-  const drawdownPct =
-    kpis.dailyDrawdownLimit > 0
-      ? (kpis.dailyDrawdownUsed / kpis.dailyDrawdownLimit) * 100
-      : 0;
-  const drawdownSeverity =
-    drawdownPct >= 80 ? "critical" : drawdownPct >= 50 ? "warning" : "normal";
+export const KpiRibbon: React.FC<KpiRibbonProps> = ({ telemetry }) => {
+  const { kpis, currentBalance, engineStatus } = telemetry;
 
-  const statusConfig = {
-    RUNNING: { label: "Running", className: "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" },
-    PAUSED: { label: "Paused", className: "bg-amber-500/15 text-amber-400 ring-amber-500/30" },
-    KILLED: { label: "Killed", className: "bg-red-500/15 text-red-400 ring-red-500/30" },
-  };
-
-  const statusCfg = statusConfig[engineStatus];
+  const isProfitable = kpis.dailyPnl >= 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-      {/* Card 1: Net P&L */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <DollarSign className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Net P&L (24h)
-          </span>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+      {/* 1. Wallet Balance Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Wallet Balance</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className="text-2xl font-bold text-white">{currentBalance.toFixed(4)} SOL</span>
         </div>
-        <p
-          className={cn(
-            "text-2xl font-bold tabular-nums",
-            pnlPositive ? "text-emerald-400" : "text-red-400"
-          )}
-        >
-          {pnlPositive ? "+" : ""}${kpis.dailyPnl.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
-        </p>
-        <p
-          className={cn(
-            "text-xs mt-1 tabular-nums",
-            pnlPositive ? "text-emerald-400/70" : "text-red-400/70"
-          )}
-        >
-          {pnlPositive ? "+" : ""}
-          {kpis.dailyPnlPct.toFixed(2)}%
-        </p>
       </div>
 
-      {/* Card 2: Win Rate */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Win Rate
+      {/* 2. Net P&L (24h) Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Net P&L (24h)</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className={`text-2xl font-bold ${isProfitable ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {isProfitable ? `+$${kpis.dailyPnl.toFixed(2)}` : `-$${Math.abs(kpis.dailyPnl).toFixed(2)}`}
+          </span>
+          <span className={`text-xs font-medium ${isProfitable ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {isProfitable ? `+${kpis.dailyPnlPct.toFixed(2)}%` : `${kpis.dailyPnlPct.toFixed(2)}%`}
           </span>
         </div>
-        <p className="text-2xl font-bold tabular-nums text-slate-50">
-          {kpis.winRate.toFixed(1)}%
-        </p>
-        <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
-          <div
-            className={cn(
-              "h-1.5 rounded-full transition-all duration-500",
-              kpis.winRate >= 60
-                ? "bg-emerald-500"
-                : kpis.winRate >= 40
-                ? "bg-amber-500"
-                : "bg-red-500"
-            )}
-            style={{ width: `${Math.min(kpis.winRate, 100)}%` }}
+      </div>
+
+      {/* 3. Win Rate Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Win Rate</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className="text-2xl font-bold text-white">{kpis.winRate.toFixed(1)}%</span>
+        </div>
+        <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div 
+            className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+            style={{ width: `${Math.min(100, Math.max(0, kpis.winRate))}%` }}
           />
         </div>
       </div>
 
-      {/* Card 3: Active Trades */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <BarChart3 className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Active Trades
-          </span>
-        </div>
-        <p className="text-2xl font-bold tabular-nums text-slate-50">
-          {kpis.activeTrades}
-        </p>
-        <p className="text-xs text-slate-400 mt-1 tabular-nums">
-          {kpis.tradesThisHour} / {kpis.maxTradesPerHour} this hour
-        </p>
-      </div>
-
-      {/* Card 4: Drawdown */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Drawdown
-          </span>
-        </div>
-        <p className="text-2xl font-bold tabular-nums text-slate-50">
-          ${kpis.dailyDrawdownUsed.toFixed(2)}
-          <span className="text-sm font-normal text-slate-400 ml-1">
-            / ${kpis.dailyDrawdownLimit.toFixed(2)}
-          </span>
-        </p>
-        <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
-          <div
-            className={cn(
-              "h-1.5 rounded-full transition-all duration-500",
-              drawdownSeverity === "critical"
-                ? "bg-red-500"
-                : drawdownSeverity === "warning"
-                ? "bg-amber-500"
-                : "bg-emerald-500"
-            )}
-            style={{ width: `${Math.min(drawdownPct, 100)}%` }}
-          />
+      {/* 4. Active Trades Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Trades</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className="text-2xl font-bold text-white">{kpis.activeTrades}</span>
+          <span className="text-xs text-slate-400">({kpis.tradesThisHour}/{kpis.maxTradesPerHour} this hour)</span>
         </div>
       </div>
 
-      {/* Card 5: Engine Status */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Cpu className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Engine Status
-          </span>
+      {/* 5. Drawdown Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Daily Drawdown</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className="text-2xl font-bold text-rose-400">-${kpis.dailyDrawdownUsed.toFixed(2)}</span>
+          <span className="text-xs text-slate-400">/ ${kpis.dailyDrawdownLimit.toFixed(2)}</span>
         </div>
-        <div className="mt-1">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-md px-2.5 py-1 text-sm font-semibold ring-1 ring-inset",
-              statusCfg.className
-            )}
-          >
-            {statusCfg.label}
-          </span>
+      </div>
+
+      {/* 6. Engine Status Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col justify-between">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Engine Status</span>
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${engineStatus === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+          <span className="text-lg font-semibold text-white">{engineStatus}</span>
         </div>
-        <p className="text-xs text-slate-400 mt-2 tabular-nums">
-          Uptime: {kpis.uptime}
-        </p>
+        <span className="text-xs text-slate-400 mt-1 truncate">{kpis.uptime}</span>
       </div>
     </div>
   );
-}
+};
