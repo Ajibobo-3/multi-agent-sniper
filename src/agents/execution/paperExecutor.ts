@@ -3,6 +3,8 @@ import * as path from 'path';
 import { CONFIG } from '../../config/index.js';
 import { eventBus } from '../../bus/eventBus.js';
 import { circuitBreaker } from '../../risk/circuitBreaker.js';
+import { walletManager } from '../../execution/walletManager.js';
+import { jitoExecutor } from '../../execution/jitoExecutor.js';
 import {
   AuditResult,
   PaperTradeRecord,
@@ -114,11 +116,21 @@ export class PaperExecutionEngine {
     this.activeTrades.set(tradeId, record);
 
     const streamTag = record.stream === 'A' ? 'Trenches' : 'Alpha';
-    console.log(`\n🚀 [ExecutionAgent] [PAPER BUY] Position Entered!`);
+    const modeTag = CONFIG.EXECUTION_MODE === 'LIVE' ? 'LIVE JITO BUY' : 'PAPER BUY';
+    console.log(`\n🚀 [ExecutionAgent] [${modeTag}] Position Entered!`);
     console.log(`   Stream: ${record.stream} (${streamTag}) | Chain: ${record.chain.toUpperCase()}`);
     console.log(`   Token: ${record.tokenSymbol} (${record.tokenAddress})`);
     console.log(`   Size: ${record.entryCapitalInvested} | Tokens: ${record.tokensBought}`);
     console.log(`   Entry: ${record.simulatedEntryPrice} | Initial Stop: ${record.currentStopLossPrice.toFixed(8)} (-20%)`);
+
+    // If LIVE mode and Solana, execute on-chain swap via Jito
+    if (CONFIG.EXECUTION_MODE === 'LIVE' && record.chain === 'solana') {
+      jitoExecutor
+        .executeLiveBuy(record.tokenAddress, record.entryCapitalInvested)
+        .catch((err) => {
+          console.error('[ExecutionAgent] Live buy order failed:', err);
+        });
+    }
 
     eventBus.emit('trade:entered', record);
     this.appendLog(record);
@@ -162,6 +174,11 @@ export class PaperExecutionEngine {
       console.log(`   Token: ${trade.tokenSymbol} | Price: ${newPrice} (Entry: ${entryPrice})`);
       console.log(`   Sold 50% bag (${tokensToSell.toFixed(0)} tokens) for ${capitalRecovered.toFixed(4)}`);
       console.log(`   Time to 2x: ${trade.timeTo2xMs}ms | Letting remaining 50% ride.`);
+
+      // If LIVE mode, fire on-chain market sell for 50% of bag
+      if (CONFIG.EXECUTION_MODE === 'LIVE' && trade.chain === 'solana') {
+        jitoExecutor.executeLiveSell(trade.tokenAddress, 50).catch(console.error);
+      }
     }
 
     // 2. RULE: Dynamic Break-Even Stop (+50% ROI / 1.5x)
@@ -212,6 +229,11 @@ export class PaperExecutionEngine {
       console.log(`   Token: ${trade.tokenSymbol} | Exit: ${newPrice} | Stop: ${trade.currentStopLossPrice}`);
       console.log(`   Net P&L: ${trade.simulatedNetPnl.toFixed(5)} (${trade.simulatedNetPnlPct.toFixed(2)}%)`);
       console.log(`   Hold Duration: ${trade.timeToStopLossMs}ms`);
+
+      // If LIVE mode, fire on-chain market sell for remaining 100% of bag
+      if (CONFIG.EXECUTION_MODE === 'LIVE' && trade.chain === 'solana') {
+        jitoExecutor.executeLiveSell(trade.tokenAddress, 100).catch(console.error);
+      }
 
       // Register with Circuit Breaker
       circuitBreaker.registerPnl(trade.simulatedNetPnl);
