@@ -12,9 +12,9 @@ interface UseTelemetryReturn {
   error: string | null;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:7777";
-const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN ?? "";
-const POLL_INTERVAL = 3000;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "sniper-dev-token-2024";
+const POLL_INTERVAL = 2500;
 
 export function useTelemetry(): UseTelemetryReturn {
   const [data, setData] = useState<TelemetryResponse | null>(null);
@@ -24,8 +24,34 @@ export function useTelemetry(): UseTelemetryReturn {
   const consecutiveErrors = useRef(0);
 
   const fetchTelemetry = useCallback(async () => {
+    // 1. Try external backend URL if specified
+    if (BACKEND_URL) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/telemetry`, {
+          headers: {
+            Authorization: `Bearer ${API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          const json: TelemetryResponse = await res.json();
+          setData(json);
+          setStatus("connected");
+          setLastUpdate(new Date());
+          setError(null);
+          consecutiveErrors.current = 0;
+          return;
+        }
+      } catch {
+        // Fallback to internal same-origin route below
+      }
+    }
+
+    // 2. Fetch from same-origin internal Next.js telemetry route
     try {
-      const res = await fetch(`${BACKEND_URL}/api/telemetry`, {
+      const res = await fetch("/api/telemetry", {
         headers: {
           Authorization: `Bearer ${API_TOKEN}`,
           "Content-Type": "application/json",
@@ -48,7 +74,6 @@ export function useTelemetry(): UseTelemetryReturn {
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
 
-      // After 3 consecutive failures, mark as error; otherwise show as disconnected (reconnecting)
       if (consecutiveErrors.current >= 3) {
         setStatus("error");
       } else {
@@ -58,12 +83,8 @@ export function useTelemetry(): UseTelemetryReturn {
   }, []);
 
   useEffect(() => {
-    // Initial fetch
     fetchTelemetry();
-
-    // Set up polling interval
     const interval = setInterval(fetchTelemetry, POLL_INTERVAL);
-
     return () => clearInterval(interval);
   }, [fetchTelemetry]);
 
