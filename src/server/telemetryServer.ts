@@ -2,9 +2,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { Server } from 'http';
 import { CONFIG } from '../config/index.js';
-import { paperEngine } from '../agents/execution/paperExecutor.js';
-import { circuitBreaker } from '../risk/circuitBreaker.js';
-import { TelemetryResponse } from '../types/index.js';
+import { executorAgent } from '../agents/4_executor.js';
+import { riskAgent } from '../agents/5_risk.js';
+import { loggerAgent } from '../agents/6_logger.js';
 
 export class TelemetryServer {
   private app: express.Application;
@@ -22,7 +22,6 @@ export class TelemetryServer {
   }
 
   private setupMiddleware(): void {
-    // Enable CORS for frontend dashboard
     this.app.use(
       cors({
         origin: '*',
@@ -33,9 +32,8 @@ export class TelemetryServer {
 
     this.app.use(express.json());
 
-    // Bearer token authentication middleware
+    // Bearer token authentication
     const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-      // Allow unauthenticated health check
       if (req.path === '/health') {
         next();
         return;
@@ -66,30 +64,57 @@ export class TelemetryServer {
   }
 
   private setupRoutes(): void {
-    // Public health probe
+    // Health probe
     this.app.get('/health', (_req: Request, res: Response) => {
       res.json({
         status: 'ok',
+        engine: '6-agent-sequential-engine',
         timestamp: new Date().toISOString(),
       });
     });
 
     /**
-     * Protected Telemetry Endpoint
-     * Returns: kpis, active_positions, ledger (last 50), and engineStatus
+     * Protected Telemetry Endpoint (/api/telemetry)
      */
     this.app.get('/api/telemetry', (_req: Request, res: Response) => {
-      const isKilled = circuitBreaker.getIsKilled();
-      const engineStatus = isKilled ? 'KILLED' : 'RUNNING';
+      const recap = loggerAgent.generateMorningRecap();
+      const activePositions = riskAgent.getActivePositions();
+      const recentTrades = loggerAgent.getRecentTrades();
+      const recentKills = loggerAgent.getRecentKills();
+      const currentBalance = executorAgent.getPaperBalance();
 
-      const responsePayload: TelemetryResponse = {
-        kpis: paperEngine.getKPIs(),
-        activePositions: paperEngine.getActivePositions(),
-        ledger: paperEngine.getLedger(50),
-        engineStatus,
+      // Mapped KPI format for dashboard compatibility
+      const kpis = {
+        dailyPnl: recap.netProfit,
+        dailyPnlPct: recap.netProfitPct,
+        winRate: recap.totalTrades > 0 ? (recap.winningTrades / recap.totalTrades) * 100 : 0,
+        totalTrades24h: recap.totalTrades,
+        activeTrades: activePositions.length,
+        dailyDrawdownUsed: Math.abs(Math.min(0, recap.netProfit)),
+        dailyDrawdownLimit: 1.0,
+        tradesThisHour: activePositions.length,
+        maxTradesPerHour: 3,
+        uptime: '24/7 Overnight Autonomous',
+        lastHeartbeat: new Date().toISOString(),
       };
 
-      res.json(responsePayload);
+      res.json({
+        engineStatus: 'RUNNING',
+        currentBalance,
+        kpis,
+        recap,
+        activePositions,
+        ledger: recentTrades,
+        recentKills,
+        lastHeartbeat: new Date().toISOString(),
+      });
+    });
+
+    /**
+     * Dedicated Morning Recap endpoint
+     */
+    this.app.get('/api/recap', (_req: Request, res: Response) => {
+      res.json(loggerAgent.generateMorningRecap());
     });
   }
 
@@ -97,10 +122,11 @@ export class TelemetryServer {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
         console.log('═══════════════════════════════════════════════════════');
-        console.log(` 📡 TELEMETRY BRIDGE ACTIVE`);
-        console.log(`   Port: ${this.port} (Hidden local interface)`);
-        console.log(`   Endpoint: GET http://localhost:${this.port}/api/telemetry`);
-        console.log(`   Auth: Bearer ${this.bearerToken}`);
+        console.log(` 📡 6-AGENT TELEMETRY SERVER ACTIVE`);
+        console.log(`    Port: ${this.port}`);
+        console.log(`    Telemetry: GET http://localhost:${this.port}/api/telemetry`);
+        console.log(`    Morning Recap: GET http://localhost:${this.port}/api/recap`);
+        console.log(`    Auth: Bearer ${this.bearerToken}`);
         console.log('═══════════════════════════════════════════════════════');
         resolve();
       });
@@ -111,7 +137,7 @@ export class TelemetryServer {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('[TelemetryServer] Server stopped.');
+          console.log('[TelemetryServer] Stopped.');
           resolve();
         });
       } else {

@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test:6agents": "tsx src/test_6agents.ts",
     "test:sim": "tsx src/test_simulation.ts",
     "test:telemetry": "tsx src/test_telemetry.ts",
     "test:listener": "tsx src/agents/listener/index.ts",
@@ -41,6 +42,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bs58": "^4.0.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.13.1",
